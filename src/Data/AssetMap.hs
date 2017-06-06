@@ -1,7 +1,8 @@
-{-# LANGUAGE DeriveLift        #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveLift          #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Data.AssetMap where
-
+import           Control.Exception
 import           Data.Aeson
 import           Data.Aeson.Encoding
 import qualified Data.ByteString.Lazy as BS
@@ -45,3 +46,18 @@ embedJSONFile fp p = do
   case eitherDecode bs of
     Left err -> fail err
     Right x -> lift (x `asProxyTypeOf` p)
+
+embedJSONFileWithFallback :: (FromJSON a, Lift a) => FilePath -> a -> Q Exp
+embedJSONFileWithFallback fp x = do
+  addDependentFile fp
+  ebs <- runIO $ try $ BS.readFile fp
+  res <- case ebs of
+    Left (e :: SomeException) -> return x
+    Right bs -> case eitherDecode bs of
+      Left err -> fail err
+      Right x' -> return x'
+  lift res
+
+-- | Return either an asset map or an empty dictionary if not found
+embedAssetMap :: FilePath -> Q Exp
+embedAssetMap fp = embedJSONFileWithFallback fp $ AssetMap M.empty Nothing
