@@ -1,0 +1,1 @@
+# aeson-asset-map
